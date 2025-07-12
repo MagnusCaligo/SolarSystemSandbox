@@ -1,0 +1,187 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+#pragma enable_d3d11_debug_symbols
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWStructuredBuffer<float3> verticesBuffer;
+RWStructuredBuffer<float2> uvsBuffer;
+RWStructuredBuffer<uint> indicesBuffer;
+
+RWStructuredBuffer<float3> initialTriangle;
+int numberOfSubdivisions;
+int maxTriangles;
+float layerHeight;
+float sideToHeightRatio;
+float heightToSideRatio;
+
+int debug = 0;
+
+
+struct Triangle
+{
+    float3 vertex1;
+    float3 vertex2;
+    float3 vertex3;
+};
+
+
+Triangle MakeTriangle( float3 v1, float3 v2, float3 v3)
+{
+    Triangle t;
+    t.vertex1 = v1;
+    t.vertex2 = v2;
+    t.vertex3 = v3;
+    return t;
+}
+
+void SubDivideTriangle()
+{
+    
+}
+
+void CreatePyramid()
+{
+    // Vertices
+    verticesBuffer[0] = float3(-0.5, 0.0, -0.5);
+    verticesBuffer[1] = float3(0.5, 0.0, -0.5);
+    verticesBuffer[2] = float3(0.5, 0.0, 0.5);
+    verticesBuffer[3] = float3(-0.5, 0.0, 0.5);
+    verticesBuffer[4] = float3(0.0, 1.0, 0.0);
+
+    // UVs
+    uvsBuffer[0] = float2(0.0, 0.0);
+    uvsBuffer[1] = float2(1.0, 0.0);
+    uvsBuffer[2] = float2(1.0, 1.0);
+    uvsBuffer[3] = float2(0.0, 1.0);
+    uvsBuffer[4] = float2(0.5, 0.5);
+
+    // Indices
+    uint indices[18] =
+    {
+        // sides
+        4, 1, 0,
+        4, 2, 1,
+        4, 3, 2,
+        4, 0, 3,
+
+        // base
+        1, 2, 0,
+        2, 3, 0
+    };
+
+    for (uint i = 0; i < 18; i++)
+    {
+        indicesBuffer[i] = indices[i];
+    }
+    
+}
+
+void ConvertTrianglesToMesh(Triangle triangles[1])
+{
+
+    for (int i = 0; i < 1; i++)
+    {
+        
+        Triangle t = triangles[i];
+        verticesBuffer[(i * 3) + 0] = t.vertex1;
+        verticesBuffer[(i * 3) + 1] = t.vertex2;
+        verticesBuffer[(i * 3) + 2] = t.vertex3;
+
+        uvsBuffer[(i * 2) + 0] = float2(0.0, 0.0);
+        uvsBuffer[(i * 2) + 1] = float2(0.0, 0.0);
+        uvsBuffer[(i * 2) + 2] = float2(0.0, 0.0);
+
+        indicesBuffer[(i * 3) + 0] = (i * 3) + 0;
+        indicesBuffer[(i * 3) + 1] = (i * 3) + 1;
+        indicesBuffer[(i * 3) + 2] = (i * 3) + 2;
+
+    }
+    
+}
+
+
+float MapValue(float val, float oldMin, float oldMax, float newMin, float newMax)
+{
+    //topIndex.y = MapValue(topIndex.y, -layerHeight * (numberOfSubdivisions + 1), 0, -initialTriangle[0].y , 0);
+    // Formula from here: https://stackoverflow.com/questions/345187/math-mapping-numbers
+    return ((val - oldMin) / (oldMax - oldMin) * (newMax - newMin)) + newMin;
+}
+
+
+[numthreads(64,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x > maxTriangles)
+        return;
+    uint layer = -1;
+    uint runningTotal = 0;
+    do
+    {
+        layer++;
+        runningTotal += (2 * layer) + 1;
+    } while (runningTotal <= id.x);
+    // Get the length of the layer, then subtract the difference between the triangle number and total triangles
+    uint layerLength = (2 * layer) + 1;
+    uint leftToGo = runningTotal - id.x - 1;
+    float posInLayer = float(layerLength) - float(leftToGo) - 1;
+
+    float direction = 1;
+    if ((layerLength - leftToGo - 1) % 2 == 1)
+        direction = 0;
+
+    float z = 0;  //heightToSideRatio * -int(layer);
+    float width = heightToSideRatio;
+
+    //float offsetFromCenterOfLayer = ((layerLength / 2.0) - posInLayer) * width * .5;
+    float offsetFromCenterOfLayer = (posInLayer * width * .5) - ((layerLength/ 2) * width * .5);
+
+    float3 topIndex = float3(
+        offsetFromCenterOfLayer,
+        (0 - float(layer)) + direction - 1,
+        //z - (heightToSideRatio * (1 - direction))
+        z
+    );  
+    float3 leftIndex = float3(
+        (offsetFromCenterOfLayer - (width / 2.0f)),
+        0 - float(layer) + (1 - direction) - 1,
+        //z - (heightToSideRatio * direction)
+        z
+    );
+    float3 rightIndex = float3(
+        (offsetFromCenterOfLayer + (width / 2.0f)),
+        0 - float(layer) + (1-direction) - 1,
+        //z - (heightToSideRatio * direction)
+        z
+    );
+
+    // Scaling
+    //topIndex.y = MapValue(topIndex.y, -layerHeight * (numberOfSubdivisions + 1), 0, -initialTriangle[0].y , 0);
+    //leftIndex.y = MapValue(leftIndex.y, -layerHeight * (numberOfSubdivisions + 1), 0, -initialTriangle[0].y , 0);
+    //rightIndex.y = MapValue(rightIndex.y, -layerHeight * (numberOfSubdivisions + 1), 0, -initialTriangle[0].y , 0);
+    //leftIndex.y *= layerHeight;
+    //rightIndex.y *= layerHeight;
+
+    verticesBuffer[(id.x * 3) + 0] = topIndex;
+    verticesBuffer[(id.x * 3) + 1] = leftIndex;
+    verticesBuffer[(id.x * 3) + 2] = rightIndex;
+
+    uvsBuffer[(id.x * 2) + 0] = float2(0.0, 0.0);
+    uvsBuffer[(id.x * 2) + 1] = float2(0.0, 0.0);
+    uvsBuffer[(id.x * 2) + 2] = float2(0.0, 0.0);
+
+    if (direction == 1)  // If the triangle points up, go clockwise, otherwise go counter clockwise
+    {
+        indicesBuffer[(id.x * 3) + 0] = (id.x * 3) + 0;
+        indicesBuffer[(id.x * 3) + 1] = (id.x * 3) + 2;
+        indicesBuffer[(id.x * 3) + 2] = (id.x * 3) + 1;
+    }
+    else
+    {
+        indicesBuffer[(id.x * 3) + 0] = (id.x * 3) + 0;
+        indicesBuffer[(id.x * 3) + 1] = (id.x * 3) + 1;
+        indicesBuffer[(id.x * 3) + 2] = (id.x * 3) + 2;
+    }
+    
+
+}
