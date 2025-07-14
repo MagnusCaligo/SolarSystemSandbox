@@ -62,7 +62,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\Scripts\CustomRigidBody.cs" />
-    <Compile Include="Assets\Scripts\GeneratePlanet.cs" />
+    <Compile Include="Assets\Scripts\ComputeShaderHelper.cs" />
     <Compile Include="Assets\Scripts\SimulationOrchestrator.cs" />
     <Compile Include="Assets\Scripts\GroundDetector.cs" />
     <Compile Include="Assets\Scripts\SimulatorPreview.cs" />
@@ -71,13 +71,16 @@
     <Compile Include="Assets\Scripts\CelestialObject.cs" />
     <Compile Include="Assets\Inputs\PlayerInput.cs" />
     <Compile Include="Assets\TutorialInfo\Scripts\Readme.cs" />
+    <Compile Include="Assets\Scripts\MeshGeneration\GeneratePlanet.cs" />
     <Compile Include="Assets\Scripts\VolumeDetector.cs" />
     <Compile Include="Assets\Scripts\Constants.cs" />
     <Compile Include="Assets\Scripts\Stars.cs" />
     <Compile Include="Assets\Scripts\Movement.cs" />
+    <Compile Include="Assets\Scripts\MeshGeneration\QuadTree.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\Shaders\GeneratePlanetMesh.compute" />
+    <None Include="Assets\Shaders\PlanetSurface.compute" />
     <None Include="Assets\Shaders\BasicUnlitShader.shader" />
     <None Include="Assets\ShaderLibrary\CustomShading.hlsl" />
     <None Include="Assets\Shaders\NoiseShader.shader" />

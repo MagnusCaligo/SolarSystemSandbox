@@ -1,0 +1,22 @@
+
+#pragma kernel CSMain
+
+RWStructuredBuffer<float3> vertexBuffer;
+
+int numVertexes;
+float3 normalizeOrigin;
+float radius;
+
+float frequency = 0.1;
+float magnitude = 1;
+
+[numthreads(64,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+
+    float heightChange = magnitude * sin(length(vertexBuffer[id.x] * frequency));
+    float3 normal = normalize(vertexBuffer[id.x] - normalizeOrigin);
+    float3 newPos = (radius * normal) + (heightChange * normal) + normalizeOrigin;
+    vertexBuffer[id.x] = newPos;
+}
+
