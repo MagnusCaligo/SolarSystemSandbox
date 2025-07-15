@@ -18,8 +18,14 @@ class QuadTree
 
     public static int maxDepth = 2;
 
-    private Vector3 point1;
-    private Vector3 point2;
+    public static Vector3 point1;
+    public static Vector3 point2;
+    public static Vector3 point3;
+    public static Vector3 point4;
+    public static Vector3 point5;
+    public static Vector3 point6;
+    public static Vector3 appliedAngle;
+    public static Vector3 followAngle;
 
     public static Dictionary<int, float> LODMapping = new Dictionary<int, float>()
     {
@@ -124,33 +130,52 @@ class QuadTree
         var p = Mathf.Acos(t);
         float angle = Mathf.Acos(Vector3.Dot(cornersAfter[0].normalized, direction));
 
-        Vector3 pointDirection = (this.distanceObjectPosition - planetOrigin).normalized;
+        Vector3 pointDirection = this.distanceObjectPosition;
         float pointAngle = Mathf.Acos(Vector3.Dot(pointDirection, direction));
 
         var a1 = Vector3.Angle(cornersAfter[0], direction);
         var a2 = Vector3.Angle(pointDirection, direction);
 
-        if (topLeftCorner == new Vector3(-50f, 50f, 0f))
+        if (topLeftCorner == new Vector3(0f, 50f, 0f))
         {
-            if (bottomRightCorner == Vector3.zero)
+            if (bottomLeftCorner == Vector3.zero)
             {
+
+              Quaternion rot = Quaternion.AngleAxis(a1, Vector3.right);
+              appliedAngle = rot * originAvg;
+              rot = Quaternion.AngleAxis(a2, Vector3.right);
+              followAngle = rot * originAvg;
 
                 point1 = planetOrigin;
                 point2 = cornersAfter[0];
+                point3 = cornersAfter[1];
+                point4 = cornersAfter[2];
+                point5 = cornersAfter[3];
+                point6 = pointDirection;
             }
 
         }
 
-        return pointAngle <= angle;
+        return a2 <= a1;
+        //return pointAngle <= angle;
     }
 
-    public void OnDrawGizmos()
+    public static void OnDrawGizmos()
     {
         if (point1 == null || point2 == null)
             return;
 
         Gizmos.color = Color.red;
         Gizmos.DrawLine(point1, point2);
+        Gizmos.DrawLine(point1, point3);
+        Gizmos.DrawLine(point1, point4);
+        Gizmos.DrawLine(point1, point5);
+        Gizmos.color = Color.blue;
+        Gizmos.DrawLine(point1, point6);
+        Gizmos.color = Color.green;
+        Gizmos.DrawLine(point1, appliedAngle);
+        Gizmos.color = Color.orange;
+        Gizmos.DrawLine(point1, followAngle);
         
     }
 

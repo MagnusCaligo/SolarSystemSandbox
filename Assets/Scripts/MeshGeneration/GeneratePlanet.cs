@@ -72,9 +72,7 @@ public class GeneratePlanet : MonoBehaviour
 
     public void OnDrawGizmos()
     {
-        foreach (QuadTree tree in Object.FindObjectsByType(typeof(QuadTree), FindObjectsSortMode.None){
-
-        }
+      QuadTree.OnDrawGizmos();
     }
 
     public void updateComputeShaderHelper()
