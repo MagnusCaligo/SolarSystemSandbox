@@ -14,6 +14,9 @@ class ComputeShaderHelper
     public float magnitude;
     public float frequency;
 
+    public Vector3 sphereLocation;
+    public float sphereRadius;
+
     public List<Vector3> recalculateVertices(List<Vector3> inputVertices)
     {
         Vector3[] output = new Vector3[inputVertices.Count];
@@ -27,10 +30,13 @@ class ComputeShaderHelper
         shader.SetVector("normalizeOrigin", origin);
         shader.SetFloat("radius", radius);
 
+        shader.SetFloat("sphereRadius", sphereRadius);
+        shader.SetVector("sphereLocation", sphereLocation);
+
         shader.SetFloat("magnitude", magnitude);
         shader.SetFloat("frequency", frequency);
 
-        shader.Dispatch(kernel, (inputVertices.Count / 64) + 1, 1, 1);
+        shader.Dispatch(kernel, (inputVertices.Count / 1024) + 1, 64, 1);
         vertexBuffer.GetData(output);
 
         return output.ToList();

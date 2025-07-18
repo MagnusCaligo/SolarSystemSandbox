@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Mathematics;
+using UnityEditor;
+using UnityEditor.Animations;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -18,14 +20,9 @@ class QuadTree
 
     public static int maxDepth = 2;
 
-    public static Vector3 point1;
-    public static Vector3 point2;
-    public static Vector3 point3;
-    public static Vector3 point4;
-    public static Vector3 point5;
-    public static Vector3 point6;
-    public static Vector3 appliedAngle;
-    public static Vector3 followAngle;
+    // Previous data 
+    private GeneratePlanet.GeneratedMeshData previousData;
+    List<QuadTree> children;
 
     public static Dictionary<int, float> LODMapping = new Dictionary<int, float>()
     {
@@ -35,21 +32,6 @@ class QuadTree
     }
     ;
 
-    public class GeneratedMeshData
-    {
-        public List<Vector3> verticies = new List<Vector3>();
-        public List<Vector2> uv = new List<Vector2>();
-        public List<int> triangles = new List<int>();
-
-        public static GeneratedMeshData operator +(GeneratedMeshData operandLeft, GeneratedMeshData operandRight)
-        {
-            int verticesCount = operandLeft.verticies.Count;
-            foreach (var vert in operandRight.verticies) operandLeft.verticies.Add(vert);
-            foreach (var uv in operandRight.uv) operandLeft.uv.Add(uv);
-            foreach (var triangle in operandRight.triangles) operandLeft.triangles.Add(triangle + verticesCount);
-            return operandLeft;
-        }
-    }
 
 
     public QuadTree(float3 origin, float squareSize, float3 objectPos, float radiusMul, ComputeShaderHelper csh) {
@@ -70,8 +52,7 @@ class QuadTree
         this.radiusMultiplier = radiusMul;
     }
 
-
-    public GeneratedMeshData GenerateMesh()
+    public GeneratePlanet.GeneratedMeshData GenerateMesh()
     {
         float distance = (origin - this.distanceObjectPosition).magnitude;
 
@@ -81,24 +62,43 @@ class QuadTree
         //if (depth < maxDepth && distance < radius * radiusMultiplier)
         if (depth < maxDepth && inCone())
         {
-            Vector3 topLeftOrigin = this.origin - new Vector3(resolution * squareSize * .25f, -resolution * squareSize *.25f, 0);
-            Vector3 topRightOrigin = this.origin - new Vector3(-resolution * squareSize * .25f, -resolution * squareSize *.25f, 0);
-            Vector3 bottomRightOrigin = this.origin - new Vector3(-resolution * squareSize * .25f, resolution * squareSize *.25f, 0);
-            Vector3 bottomLeftOrigin = this.origin - new Vector3(resolution * squareSize * .25f, resolution * squareSize *.25f, 0);
 
-            QuadTree topLeft     = new QuadTree(topLeftOrigin, squareSize / 2.0f, distanceObjectPosition, depth + 1, radiusMultiplier);
-            QuadTree topRight    = new QuadTree(topRightOrigin, squareSize / 2.0f, distanceObjectPosition, depth + 1, radiusMultiplier);
-            QuadTree bottomRight = new QuadTree(bottomRightOrigin, squareSize / 2.0f, distanceObjectPosition, depth + 1, radiusMultiplier);
-            QuadTree bottomLeft  = new QuadTree(bottomLeftOrigin, squareSize / 2.0f, distanceObjectPosition, depth + 1, radiusMultiplier);
+            if (children == null)
+            {
 
-            var gmd = topLeft.GenerateMesh();
-            gmd += topRight.GenerateMesh();
-            gmd += bottomLeft.GenerateMesh();
-            gmd += bottomRight.GenerateMesh();
+                children = new List<QuadTree>();
+                Vector3 topLeftOrigin = this.origin - new Vector3(resolution * squareSize * .25f, -resolution * squareSize * .25f, 0);
+                Vector3 topRightOrigin = this.origin - new Vector3(-resolution * squareSize * .25f, -resolution * squareSize * .25f, 0);
+                Vector3 bottomRightOrigin = this.origin - new Vector3(-resolution * squareSize * .25f, resolution * squareSize * .25f, 0);
+                Vector3 bottomLeftOrigin = this.origin - new Vector3(resolution * squareSize * .25f, resolution * squareSize * .25f, 0);
+
+                QuadTree topLeft = new QuadTree(topLeftOrigin, squareSize / 2.0f, distanceObjectPosition, depth + 1, radiusMultiplier);
+                QuadTree topRight = new QuadTree(topRightOrigin, squareSize / 2.0f, distanceObjectPosition, depth + 1, radiusMultiplier);
+                QuadTree bottomRight = new QuadTree(bottomRightOrigin, squareSize / 2.0f, distanceObjectPosition, depth + 1, radiusMultiplier);
+                QuadTree bottomLeft = new QuadTree(bottomLeftOrigin, squareSize / 2.0f, distanceObjectPosition, depth + 1, radiusMultiplier);
+
+                children.Add(topLeft);
+                children.Add(topRight);
+                children.Add(bottomRight);
+                children.Add(bottomLeft);
+            }
+
+            GeneratePlanet.GeneratedMeshData gmd = new GeneratePlanet.GeneratedMeshData();
+            foreach (var child in children)
+            {
+                gmd += child.GenerateMesh();
+            }
+
+            previousData = null;
             return gmd;
         }
+        if (children != null)
+            foreach (var child in children)
+                child.previousData = null;
 
-       return GenerateVerticesAndTrianglesAroundOrigin();
+        if (previousData == null)
+            previousData = GenerateVerticesAndTrianglesAroundOrigin();
+        return previousData;
     }
 
     public bool inCone()
@@ -124,59 +124,9 @@ class QuadTree
             originAvg += v;
         originAvg /= 4.0f;
 
-        Vector3 direction = (originAvg - planetOrigin).normalized;
-
-        var t = Vector3.Dot(cornersAfter[0].normalized, direction);
-        var p = Mathf.Acos(t);
-        float angle = Mathf.Acos(Vector3.Dot(cornersAfter[0].normalized, direction));
-
-        Vector3 pointDirection = this.distanceObjectPosition;
-        float pointAngle = Mathf.Acos(Vector3.Dot(pointDirection, direction));
-
-        var a1 = Vector3.Angle(cornersAfter[0], direction);
-        var a2 = Vector3.Angle(pointDirection, direction);
-
-        if (topLeftCorner == new Vector3(0f, 50f, 0f))
-        {
-            if (bottomLeftCorner == Vector3.zero)
-            {
-
-              Quaternion rot = Quaternion.AngleAxis(a1, Vector3.right);
-              appliedAngle = rot * originAvg;
-              rot = Quaternion.AngleAxis(a2, Vector3.right);
-              followAngle = rot * originAvg;
-
-                point1 = planetOrigin;
-                point2 = cornersAfter[0];
-                point3 = cornersAfter[1];
-                point4 = cornersAfter[2];
-                point5 = cornersAfter[3];
-                point6 = pointDirection;
-            }
-
-        }
-
-        return a2 <= a1;
+        return (originAvg - distanceObjectPosition).magnitude < squareSize * resolution * radiusMultiplier;
+        //return a2 <= a1;
         //return pointAngle <= angle;
-    }
-
-    public static void OnDrawGizmos()
-    {
-        if (point1 == null || point2 == null)
-            return;
-
-        Gizmos.color = Color.red;
-        Gizmos.DrawLine(point1, point2);
-        Gizmos.DrawLine(point1, point3);
-        Gizmos.DrawLine(point1, point4);
-        Gizmos.DrawLine(point1, point5);
-        Gizmos.color = Color.blue;
-        Gizmos.DrawLine(point1, point6);
-        Gizmos.color = Color.green;
-        Gizmos.DrawLine(point1, appliedAngle);
-        Gizmos.color = Color.orange;
-        Gizmos.DrawLine(point1, followAngle);
-        
     }
 
     // Kinda useless, I realize that the frustrum of the corners doesn't work when the radius is small. Need to use a cone.
@@ -215,9 +165,9 @@ class QuadTree
                 Vector3.Dot(leftPlane, relativeToOrigin)   >= 0;
     }
 
-    public  GeneratedMeshData GenerateVerticesAndTrianglesAroundOrigin()
+    public  GeneratePlanet.GeneratedMeshData GenerateVerticesAndTrianglesAroundOrigin()
     {
-        GeneratedMeshData gmd = new GeneratedMeshData();
+        GeneratePlanet.GeneratedMeshData gmd = new GeneratePlanet.GeneratedMeshData();
 
         // We will generate a plane of from the top left corner. 
         // We start with the triangles one square at a time. 

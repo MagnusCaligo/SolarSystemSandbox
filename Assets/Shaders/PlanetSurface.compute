@@ -3,20 +3,27 @@
 
 RWStructuredBuffer<float3> vertexBuffer;
 
+float3 sphereLocation;
+float sphereRadius;
+
 int numVertexes;
-float3 normalizeOrigin;
-float radius;
 
-float frequency = 0.1;
-float magnitude = 1;
-
-[numthreads(64,1,1)]
+[numthreads(1024,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
 
-    float heightChange = magnitude * sin(length(vertexBuffer[id.x] * frequency));
-    float3 normal = normalize(vertexBuffer[id.x] - normalizeOrigin);
-    float3 newPos = (radius * normal) + (heightChange * normal) + normalizeOrigin;
+    float3 normal = normalize(vertexBuffer[id.x]);
+    float3 newPos = normal;
+
+    if (length(newPos - sphereLocation) < sphereRadius)
+    {
+        float3 sphereNormal = normalize(newPos - sphereLocation);
+        float distanceFromCenter = length(newPos - sphereLocation);
+        float difference = pow(pow(sphereRadius, 2) - pow(distanceFromCenter, 2), .5f);
+        newPos = newPos - (difference * normal);
+    }
+    
+    
     vertexBuffer[id.x] = newPos;
 }
 
